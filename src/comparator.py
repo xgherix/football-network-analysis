@@ -1,12 +1,24 @@
 import pandas as pd
 import networkx as nx
-from src.data_loader import get_team_passes
+from src.data_loader import get_team_passes_filtered
 from src.network_builder import build_passing_network
 from src.metrics import all_metrics
 
-def compare_teams(match_id: int, team1: str, team2: str) -> dict:
-    passes1 = get_team_passes(match_id, team1)
-    passes2 = get_team_passes(match_id, team2)
+
+def compare_teams(
+    match_id: int,
+    team1: str,
+    team2: str,
+    period: int = None,
+    starting_xi_only: bool = False
+) -> dict:
+
+    passes1 = get_team_passes_filtered(match_id, team1,
+                                       period=period,
+                                       starting_xi_only=starting_xi_only)
+    passes2 = get_team_passes_filtered(match_id, team2,
+                                       period=period,
+                                       starting_xi_only=starting_xi_only)
 
     G1 = build_passing_network(passes1)
     G2 = build_passing_network(passes2)
@@ -14,15 +26,39 @@ def compare_teams(match_id: int, team1: str, team2: str) -> dict:
     metrics1 = all_metrics(G1)
     metrics2 = all_metrics(G2)
 
-    summary1 =_network_summary(G1, team1)
+    summary1 = _network_summary(G1, team1)
     summary2 = _network_summary(G2, team2)
 
     return {
-        "team1": {"name": team1, "metrics": metrics1, "summary": summary1, "graph": G1, "passes": passes1},
-        "team2": {"name": team2, "metrics": metrics2, "summary": summary2, "graph": G2, "passes": passes2},
+        "team1": {
+            "name": team1,
+            "metrics": metrics1,
+            "summary": summary1,
+            "graph": G1,
+            "passes": passes1
+        },
+        "team2": {
+            "name": team2,
+            "metrics": metrics2,
+            "summary": summary2,
+            "graph": G2,
+            "passes": passes2
+        },
     }
 
-def _network_summary(G: nx.DiGraph, team: str) -> pd.DataFrame:
+
+def _network_summary(G: nx.DiGraph, team: str) -> dict:
+    if G.number_of_nodes() == 0:
+        return {
+            "team": team,
+            "total_passes": 0,
+            "density": 0,
+            "top_pagerank_player": "N/A",
+            "top_betweenness_player": "N/A",
+            "avg_clustering": 0,
+            "num_players": 0,
+        }
+
     pagerank = nx.pagerank(G, weight="weight")
     betweenness = nx.betweenness_centrality(G, weight="weight", normalized=True)
 
@@ -42,6 +78,7 @@ def _network_summary(G: nx.DiGraph, team: str) -> pd.DataFrame:
         "num_players": G.number_of_nodes(),
     }
 
+
 def compare_summary_df(comparison: dict) -> pd.DataFrame:
     s1 = comparison["team1"]["summary"]
     s2 = comparison["team2"]["summary"]
@@ -55,7 +92,7 @@ def compare_summary_df(comparison: dict) -> pd.DataFrame:
             "Top PageRank player",
             "Top betweenness player",
         ],
-      s1["team"]: [
+        s1["team"]: [
             s1["total_passes"],
             s1["density"],
             s1["avg_clustering"],
@@ -63,7 +100,7 @@ def compare_summary_df(comparison: dict) -> pd.DataFrame:
             s1["top_pagerank_player"],
             s1["top_betweenness_player"],
         ],
-            s2["team"]: [
+        s2["team"]: [
             s2["total_passes"],
             s2["density"],
             s2["avg_clustering"],

@@ -30,3 +30,33 @@ def get_team_passes(match_id: int, team: str) -> pd.DataFrame:
     passes = get_passes(match_id)
     team_passes = passes[passes["team"] == team].copy()
     return team_passes
+
+def get_starting_xi(match_id: int, team: str) -> list:
+    events = get_events(match_id)
+    lineups = events[
+        (events["type"] == "Starting XI") &
+        (events["team"] == team)
+    ]
+    if lineups.empty:
+        return []
+    lineup = lineups.iloc[0]["tactics"]["lineup"]
+    return [p["player"]["name"] for p in lineup]
+
+def get_team_passes_filtered(
+    match_id: int,
+    team: str,
+    period: int = None,
+    starting_xi_only: bool = False
+) -> pd.DataFrame:
+
+    passes = get_team_passes(match_id, team)
+
+    if period is not None:
+        passes = passes[passes["period"] == period].copy()
+
+    if starting_xi_only:
+        starting = get_starting_xi(match_id, team)
+        if starting:
+            passes = passes[passes["player"].isin(starting)].copy()
+
+    return passes
