@@ -60,9 +60,6 @@ football-network-analysis/
 │   ├── comparator.py        # Team and match comparison
 │   └── interpreter.py       # Automatic tactical interpretation
 │
-├── data/                    # Local data files
-├── notebooks/               # Jupyter exploration notebooks
-├── outputs/                 # Saved figures
 ├── app.py                   # Streamlit dashboard entry point
 └── requirements.txt         # Project dependencies
 ```

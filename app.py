@@ -194,7 +194,17 @@ if mode == "Single team":
             "total_degree": "{:.4f}",
             "betweenness":  "{:.4f}",
             "pagerank":     "{:.4f}",
-        }),
+        }).background_gradient(
+            subset=["in_degree"],    cmap="Greens"
+        ).background_gradient(
+            subset=["out_degree"],   cmap="Purples"
+        ).background_gradient(
+            subset=["total_degree"], cmap="Oranges"
+        ).background_gradient(
+            subset=["betweenness"],  cmap="Blues"
+        ).background_gradient(
+            subset=["pagerank"],     cmap="Reds"
+        ),
         use_container_width=True
     )
 
@@ -247,7 +257,17 @@ elif mode == "Compare teams":
             "total_degree": "{:.4f}",
             "betweenness":  "{:.4f}",
             "pagerank":     "{:.4f}",
-        }), use_container_width=True)
+        }).background_gradient(
+            subset=["in_degree"],    cmap="Greens"
+        ).background_gradient(
+            subset=["out_degree"],   cmap="Purples"
+        ).background_gradient(
+            subset=["total_degree"], cmap="Oranges"
+        ).background_gradient(
+            subset=["betweenness"],  cmap="Blues"
+        ).background_gradient(
+            subset=["pagerank"],     cmap="Reds"
+        ), use_container_width=True)
 
     with col2:
         st.markdown(f"### {away_team}")
@@ -266,11 +286,20 @@ elif mode == "Compare teams":
         r2c3.metric("Total passes",   s2["total_passes"])
 
         st.markdown("---")
-        metrics_legend()
-        st.dataframe(comparison["team2"]["metrics"].style.format({
+        st.dataframe(comparison["team1"]["metrics"].style.format({
             "in_degree":    "{:.4f}",
             "out_degree":   "{:.4f}",
             "total_degree": "{:.4f}",
             "betweenness":  "{:.4f}",
             "pagerank":     "{:.4f}",
-        }), use_container_width=True)
+        }).background_gradient(
+            subset=["in_degree"],    cmap="Greens"
+        ).background_gradient(
+            subset=["out_degree"],   cmap="Purples"
+        ).background_gradient(
+            subset=["total_degree"], cmap="Oranges"
+        ).background_gradient(
+            subset=["betweenness"],  cmap="Blues"
+        ).background_gradient(
+            subset=["pagerank"],     cmap="Reds"
+        ), use_container_width=True)
