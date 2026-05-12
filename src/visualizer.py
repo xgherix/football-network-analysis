@@ -49,20 +49,32 @@ def draw_pitch_shapes():
 
 
 def draw_passing_network(G: nx.DiGraph, passes: pd.DataFrame,
-                         team_name: str = "Team", flip: bool = False):
+                         team_name: str = "Team", flip: bool = False,
+                         color_metric: str = "pagerank"):
 
     avg_positions = get_avg_positions(passes)
     if flip:
         avg_positions = flip_coordinates(avg_positions)
-
     avg_positions = avg_positions[avg_positions.index.isin(G.nodes)]
 
-    pagerank = nx.pagerank(G, weight="weight")
+    pagerank    = nx.pagerank(G, weight="weight")
     betweenness = nx.betweenness_centrality(G, weight="weight", normalized=True)
-    max_pr = max(pagerank.values()) if pagerank else 1
+    in_degree   = nx.in_degree_centrality(G)
+    out_degree  = nx.out_degree_centrality(G)
+
+    metric_map = {
+        "pagerank":    (pagerank,    "PageRank",    "Oranges"),
+        "betweenness": (betweenness, "Betweenness", "Blues"),
+        "in_degree":   (in_degree,   "In-degree",   "Greens"),
+        "out_degree":  (out_degree,  "Out-degree",  "Purples"),
+    }
+
+    metric_values, metric_label, colorscale = metric_map[color_metric]
+    max_pr         = max(pagerank.values())      if pagerank      else 1
+    max_metric_val = max(metric_values.values()) if metric_values else 1
 
     pass_counts = {(u, v): d["weight"] for u, v, d in G.edges(data=True)}
-    max_weight = max(pass_counts.values()) if pass_counts else 1
+    max_weight  = max(pass_counts.values()) if pass_counts else 1
 
     edge_traces = []
     for (u, v), weight in pass_counts.items():
@@ -79,22 +91,32 @@ def draw_passing_network(G: nx.DiGraph, passes: pd.DataFrame,
                 showlegend=False
             ))
 
-    node_x, node_y, node_size, node_color, node_hover = [], [], [], [], []
+    node_x     = []
+    node_y     = []
+    node_size  = []
+    node_color = []
+    node_hover = []
 
     for player, row in avg_positions.iterrows():
-        pr = pagerank.get(player, 0)
-        bw = betweenness.get(player, 0)
+        pr           = pagerank.get(player, 0)
+        bw           = betweenness.get(player, 0)
+        ind          = in_degree.get(player, 0)
+        oud          = out_degree.get(player, 0)
         total_passes = sum(G[player][v]["weight"] for v in G.successors(player))
-        received = sum(G[u][player]["weight"] for u in G.predecessors(player))
+        received     = sum(G[u][player]["weight"] for u in G.predecessors(player))
+        metric_val   = metric_values.get(player, 0)
 
         node_x.append(float(row["x"]))
         node_y.append(float(row["y"]))
         node_size.append(30 + 50 * (pr / max_pr))
-        node_color.append(float(pr))
+        node_color.append(float(metric_val))
         node_hover.append(
             f"<b>{player}</b><br>"
+            f"{metric_label}: {metric_val:.4f}<br>"
             f"PageRank: {pr:.4f}<br>"
             f"Betweenness: {bw:.4f}<br>"
+            f"In-degree: {ind:.4f}<br>"
+            f"Out-degree: {oud:.4f}<br>"
             f"Passes made: {total_passes}<br>"
             f"Passes received: {received}"
         )
@@ -114,10 +136,12 @@ def draw_passing_network(G: nx.DiGraph, passes: pd.DataFrame,
             symbol="circle",
             size=node_size,
             color=node_color,
-            colorscale="Oranges",
+            colorscale=colorscale,
+            cmin=0,
+            cmax=max_metric_val,
             showscale=True,
             colorbar=dict(
-                title=dict(text="PageRank", font=dict(color="white")),
+                title=dict(text=metric_label, font=dict(color="white")),
                 tickfont=dict(color="white"),
             ),
             line=dict(color="white", width=2),
@@ -129,7 +153,7 @@ def draw_passing_network(G: nx.DiGraph, passes: pd.DataFrame,
         data=edge_traces + [node_trace],
         layout=go.Layout(
             title=dict(
-                text=f"{team_name} — passing network",
+                text=f"{team_name} — passing network — colored by {metric_label}",
                 font=dict(color="white", size=18),
                 x=0.5
             ),

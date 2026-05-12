@@ -78,8 +78,51 @@ period, starting_xi_only = period_map[analysis_mode]
 st.sidebar.markdown("---")
 st.sidebar.caption("Data provided by StatsBomb Open Data")
 
+
+def metrics_legend():
+    with st.expander("📖 How to read the metrics table", expanded=False):
+        st.markdown("""
+### Metric descriptions and value ranges
+
+| Metric | Description | Low | Medium | High |
+|---|---|---|---|---|
+| **In-degree** | How often a player *receives* passes from different teammates. Normalized between 0 and 1. | < 0.2 — rarely sought | 0.2 – 0.5 — regularly involved | > 0.5 — primary target |
+| **Out-degree** | How often a player *gives* passes to different teammates. Normalized between 0 and 1. | < 0.2 — rarely distributes | 0.2 – 0.5 — regular distributor | > 0.5 — main organizer |
+| **Total degree** | Sum of in-degree and out-degree. Overall passing involvement. Range 0 to 2. | < 0.4 — low involvement | 0.4 – 1.0 — moderate involvement | > 1.0 — dominant in passing |
+| **Betweenness** | How often a player sits on the shortest path between two teammates. Normalized 0 to 1. | < 0.05 — not a bridge | 0.05 – 0.2 — moderate connector | > 0.2 — critical bridge player |
+| **PageRank** | Prestige score — weighted by the importance of teammates who pass to this player. Range 0 to 1. | < 0.05 — low influence | 0.05 – 0.1 — moderate influence | > 0.1 — tactical heart |
+
+---
+
+### Tactical interpretation guide
+
+- 🔴 **High PageRank + High In-degree** → Tactical heart — the player the team is built around
+- 🔵 **High Betweenness + Moderate Degree** → Key bridge — removing this player fragments the team
+- 🟣 **High Out-degree + Low In-degree** → Main distributor — organizes play, rarely targeted
+- 🟢 **High In-degree + Low Out-degree** → Target player — sought by teammates, less involved in build-up
+- ⚪ **Low values across all metrics** → Low involvement — limited integration in the passing network
+
+---
+
+### How to use this table
+- **Sort** any column by clicking the column header
+- **Higher values are always better** in terms of network involvement
+- Compare values **within the same match** — absolute values vary between matches
+""")
+
+
 if mode == "Single team":
     team = st.sidebar.selectbox("Select team", [home_team, away_team])
+    color_metric = st.sidebar.selectbox(
+        "Color nodes by",
+        ["pagerank", "betweenness", "in_degree", "out_degree"],
+        format_func=lambda x: {
+            "pagerank":    "PageRank — tactical influence",
+            "betweenness": "Betweenness — bridge players",
+            "in_degree":   "In-degree — most sought",
+            "out_degree":  "Out-degree — main distributors"
+        }[x]
+    )
     opponent = away_team if team == home_team else home_team
     flip = team == away_team
 
@@ -90,11 +133,12 @@ if mode == "Single team":
         opponent_passes = get_team_passes_filtered(match_id, opponent,
                                                    period=period,
                                                    starting_xi_only=starting_xi_only)
-        G = build_passing_network(passes)
+        G     = build_passing_network(passes)
         G_opp = build_passing_network(opponent_passes)
-        fig = draw_passing_network(G, passes, f"{team} — {analysis_mode}", flip=flip)
-        metrics = all_metrics(G)
-        summary = get_network_summary(G)
+        fig   = draw_passing_network(G, passes, f"{team} — {analysis_mode}",
+                                     flip=flip, color_metric=color_metric)
+        metrics    = all_metrics(G)
+        summary    = get_network_summary(G)
         clustering = nx.average_clustering(G.to_undirected())
 
     st.plotly_chart(fig, use_container_width=True)
@@ -120,35 +164,36 @@ if mode == "Single team":
     st.subheader("Player roles")
     col1, col2, col3, col4 = st.columns(4)
 
-    top_pagerank = metrics.loc[metrics["pagerank"].idxmax(), "player"]
+    top_pagerank    = metrics.loc[metrics["pagerank"].idxmax(),    "player"]
     top_betweenness = metrics.loc[metrics["betweenness"].idxmax(), "player"]
-    top_out = metrics.loc[metrics["out_degree"].idxmax(), "player"]
-    top_in = metrics.loc[metrics["in_degree"].idxmax(), "player"]
+    top_out         = metrics.loc[metrics["out_degree"].idxmax(),  "player"]
+    top_in          = metrics.loc[metrics["in_degree"].idxmax(),   "player"]
 
-    col1.metric("Tactical heart", top_pagerank, help="Highest PageRank")
-    col2.metric("Key bridge", top_betweenness, help="Highest Betweenness")
-    col3.metric("Main distributor", top_out, help="Highest Out-degree")
-    col4.metric("Most sought", top_in, help="Highest In-degree")
+    col1.metric("Tactical heart",   top_pagerank,    help="Highest PageRank")
+    col2.metric("Key bridge",       top_betweenness, help="Highest Betweenness")
+    col3.metric("Main distributor", top_out,         help="Highest Out-degree")
+    col4.metric("Most sought",      top_in,          help="Highest In-degree")
 
     st.markdown("---")
 
     st.subheader("Network statistics")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total passes", summary["total_passes"])
+    c1.metric("Total passes",         summary["total_passes"])
     c2.metric("Passing combinations", summary["passing_combinations"])
-    c3.metric("Network density", summary["density"])
-    c4.metric("Avg clustering", round(clustering, 4))
+    c3.metric("Network density",      summary["density"])
+    c4.metric("Avg clustering",       round(clustering, 4))
 
     st.markdown("---")
 
     st.subheader("Player metrics")
+    metrics_legend()
     st.dataframe(
         metrics.style.format({
-            "in_degree": "{:.4f}",
-            "out_degree": "{:.4f}",
+            "in_degree":    "{:.4f}",
+            "out_degree":   "{:.4f}",
             "total_degree": "{:.4f}",
-            "betweenness": "{:.4f}",
-            "pagerank": "{:.4f}",
+            "betweenness":  "{:.4f}",
+            "pagerank":     "{:.4f}",
         }),
         use_container_width=True
     )
@@ -191,13 +236,17 @@ elif mode == "Compare teams":
         s1 = comparison["team1"]["summary"]
         r1c1, r1c2, r1c3 = st.columns(3)
         r1c1.metric("Tactical heart", s1["top_pagerank_player"])
-        r1c2.metric("Key bridge", s1["top_betweenness_player"])
-        r1c3.metric("Total passes", s1["total_passes"])
+        r1c2.metric("Key bridge",     s1["top_betweenness_player"])
+        r1c3.metric("Total passes",   s1["total_passes"])
 
+        st.markdown("---")
+        metrics_legend()
         st.dataframe(comparison["team1"]["metrics"].style.format({
-            "in_degree": "{:.4f}", "out_degree": "{:.4f}",
-            "total_degree": "{:.4f}", "betweenness": "{:.4f}",
-            "pagerank": "{:.4f}",
+            "in_degree":    "{:.4f}",
+            "out_degree":   "{:.4f}",
+            "total_degree": "{:.4f}",
+            "betweenness":  "{:.4f}",
+            "pagerank":     "{:.4f}",
         }), use_container_width=True)
 
     with col2:
@@ -213,11 +262,15 @@ elif mode == "Compare teams":
         s2 = comparison["team2"]["summary"]
         r2c1, r2c2, r2c3 = st.columns(3)
         r2c1.metric("Tactical heart", s2["top_pagerank_player"])
-        r2c2.metric("Key bridge", s2["top_betweenness_player"])
-        r2c3.metric("Total passes", s2["total_passes"])
+        r2c2.metric("Key bridge",     s2["top_betweenness_player"])
+        r2c3.metric("Total passes",   s2["total_passes"])
 
+        st.markdown("---")
+        metrics_legend()
         st.dataframe(comparison["team2"]["metrics"].style.format({
-            "in_degree": "{:.4f}", "out_degree": "{:.4f}",
-            "total_degree": "{:.4f}", "betweenness": "{:.4f}",
-            "pagerank": "{:.4f}",
+            "in_degree":    "{:.4f}",
+            "out_degree":   "{:.4f}",
+            "total_degree": "{:.4f}",
+            "betweenness":  "{:.4f}",
+            "pagerank":     "{:.4f}",
         }), use_container_width=True)
